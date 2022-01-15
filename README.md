@@ -1,1 +1,3 @@
 # chatVote
+# └ client
+# └ server
