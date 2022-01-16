@@ -5,6 +5,8 @@
  */
 console.log('start@app.js');
 
+var p = require('./p');
+
 const path = require("path");
 const fs = require('fs');
 const express = require('express');
@@ -31,7 +33,7 @@ const mysql = require('mysql2');
 const connection = mysql.createConnection({
 	host: 'localhost',
 	user: 'daich',
-	password: 'xxxxX',
+	password: p.password,
 	database: 'daichDB'
 });
 
@@ -45,47 +47,52 @@ connection.connect((err) => {
 
 app.use(
 	router.get(`/chatVote/view`, (req, res) => {
-		const exeQuery = (queryStr, callback) => {
-			console.log(`--- run SQL. query : ${queryStr}`);
-			connection.query(
-				queryStr,
-				(error, result, fields) => {
-					console.log(Object.prototype.toString.call(result));
-					console.log(result);
-					if (error) {
-						return connection.rollback(() => {
-							throw error;
-						});
-					}
-					connection.commit((err) => {
-						if (err) {
+		const exeQuery = (queryStr) => {
+			return new Promise((resolve, reject) => {
+				console.log(`--- run SQL. query : ${queryStr}`);
+				connection.query(
+					queryStr,
+					(error, result, fields) => {
+						console.log(Object.prototype.toString.call(result));
+						console.log(result);
+						if (error) {
 							return connection.rollback(() => {
-								throw err;
+								throw error;
 							});
 						}
-						console.log('commit success!');
-					});
-					return callback(result);
-				}
-			);
+						connection.commit((err) => {
+							if (err) {
+								return connection.rollback(() => {
+									throw err;
+								});
+							}
+							console.log('commit success!');
+						});
+					}
+				);
+			});
 		};
 
 		const render = (result) => {
-			let err;
-			if (result.length === 0) err = 'QUESTION 0件。';
-			// views/index.ejsをレンダリングし、データを渡す
-			if (err) {
-				res.render("index", { err: err });
-			} else {
-				res.render("index", { streamer: result[0]['STREAMER'] });
-			}
+			return new Promise((resolve, reject) => {
+				let err;
+				if (result.length === 0) err = 'QUESTION 0件。';
+				// views/index.ejsをレンダリングし、データを渡す
+				if (err) {
+					res.render("index", { err: err });
+				} else {
+					res.render("index", { err: null });
+					res.render("index", { streamer: result[0]['STREAMER'] });
+				}
+			});
 		};
 		const stremaer = req.query.streamer;
 		// QUESTION_SEQのシーケンス取得
 		const selMaxIdQuery = 'select * from QUESTION where ID = ('
 			+ 'select MAX(ID) from QUESTION where STREAMER = \'' + stremaer
 			+ '\');';
-		exeQuery(selMaxIdQuery, render);
+
+		exeQuery(selMaxIdQuery).then(render);
 	})
 );
 
